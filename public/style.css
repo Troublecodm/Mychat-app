@@ -1,0 +1,64 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #101820;
+  color: white;
+  margin: 0;
+  overflow: hidden;
+}
+#chat {
+  width: 80%;
+  margin: 2rem auto;
+  background: #1c1c1c;
+  border-radius: 12px;
+  padding: 1rem;
+  height: 70vh;
+  overflow-y: auto;
+}
+.dm-popup {
+  position: fixed;
+  bottom: 10%;
+  right: 10%;
+  width: 60%;
+  height: 70%;
+  background: #181818;
+  border: 2px solid #2e2e2e;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0,0,0,0.6);
+  animation: fadeIn 0.3s ease-in;
+}
+@keyframes fadeIn {
+  from {opacity: 0; transform: scale(0.9);}
+  to {opacity: 1; transform: scale(1);}
+}
+.dm-header {
+  padding: 0.8rem;
+  background: #222;
+  font-weight: bold;
+  border-bottom: 1px solid #333;
+}
+.dm-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.8rem;
+}
+.dm-input {
+  display: flex;
+  border-top: 1px solid #333;
+}
+.dm-input input {
+  flex: 1;
+  padding: 0.6rem;
+  background: #111;
+  border: none;
+  color: white;
+}
+.dm-input button {
+  background: #03a9f4;
+  border: none;
+  color: white;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+}

@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ChatApp</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; }
+    #users { width: 200px; border-right: 1px solid #ccc; padding: 10px; overflow-y: auto; }
+    #chat { flex: 1; display: flex; flex-direction: column; }
+    #messages { flex: 1; overflow-y: auto; padding: 10px; }
+    #input { display: flex; padding: 10px; }
+    #input input { flex: 1; padding: 5px; }
+    #input button { padding: 5px 10px; }
+    .dm-popup { position: fixed; bottom: 10px; right: 10px; width: 300px; background: #eee; border: 1px solid #ccc; display: none; flex-direction: column; }
+    .dm-popup .messages { flex: 1; overflow-y: auto; padding: 5px; height: 150px; }
+    .dm-popup input { padding: 5px; }
+  </style>
+</head>
+<body>
+  <div id="users"><h3>Users</h3><ul id="userList"></ul></div>
+  <div id="chat">
+    <div id="messages"></div>
+    <div id="input">
+      <input id="msg" placeholder="Type a message...">
+      <button id="send">Send</button>
+    </div>
+  </div>
+
+  <div id="dmPopup" class="dm-popup">
+    <h4 id="dmTitle"></h4>
+    <div class="messages" id="dmMessages"></div>
+    <input id="dmInput" placeholder="Message">
+    <button id="dmSend">Send</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const username = localStorage.getItem('username');
+    if (!username) window.location.href = '/login.html';
+    socket.emit('join', username);
+
+    const messages = document.getElementById('messages');
+    const msgInput = document.getElementById('msg');
+    const sendBtn = document.getElementById('send');
+    const userList = document.getElementById('userList');
+
+    // Send public message
+    sendBtn.onclick = () => {
+      if (!msgInput.value) return;
+      socket.emit('chat message', msgInput.value);
+      msgInput.value = '';
+    };
+
+    // Receive public message
+    socket.on('chat message', ({ user, msg }) => {
+      const div = document.createElement('div');
+      div.textContent = user + ': ' + msg;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    });
+
+    // --- DMs ---
+    const dmPopup = document.getElementById('dmPopup');
+    const dmTitle = document.getElementById('dmTitle');
+    const dmMessages = document.getElementById('dmMessages');
+    const dmInput = document.getElementById('dmInput');
+    const dmSend = document.getElementById('dmSend');
+    let currentDM = '';
+
+    // Open DM
+    function openDM(to) {
+      currentDM = to;
+      dmTitle.textContent = 'DM: ' + to;
+      dmMessages.innerHTML = '';
+      dmPopup.style.display = 'flex';
+    }
+
+    dmSend.onclick = () => {
+      if (!dmInput.value || !currentDM) return;
+      socket.emit('dm', { to: currentDM, msg: dmInput.value });
+      dmInput.value = '';
+    };
+
+    socket.on('dm', ({ from, msg, to }) => {
+      if (to === username) openDM(from);
+      if ((from === currentDM) || (to === username && from === currentDM)) {
+        const div = document.createElement('div');
+        div.textContent = from + ': ' + msg;
+        dmMessages.appendChild(div);
+        dmMessages.scrollTop = dmMessages.scrollHeight;
+      }
+    });
+  </script>
+</body>
+</html>
