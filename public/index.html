@@ -1,119 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MyChat — Starry Edition</title>
-  <style>
-    /* Starry background */
-    body {
-      margin: 0;
-      height: 100vh;
-      background: black;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
-      color: white;
-    }
-    canvas#stars {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-    }
-    /* Chat container */
-    #chat-container {
-      position: absolute;
-      top: 50px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 90%;
-      max-width: 500px;
-      background: rgba(0,0,0,0.6);
-      padding: 20px;
-      border-radius: 10px;
-      z-index: 1;
-    }
-    #messages {
-      height: 300px;
-      overflow-y: auto;
-      margin-bottom: 10px;
-      border: 1px solid rgba(255,255,255,0.3);
-      padding: 10px;
-      border-radius: 5px;
-    }
-    #message-input {
-      width: calc(100% - 70px);
-      padding: 10px;
-      border-radius: 5px;
-      border: none;
-    }
-    #send-btn {
-      width: 60px;
-      padding: 10px;
-      margin-left: 5px;
-      border: none;
-      border-radius: 5px;
-      background: #1E90FF;
-      color: white;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyChat</title>
+<style>
+  body { margin:0; padding:0; height:100vh; background:black; font-family: Arial,sans-serif; overflow:hidden; }
+  .star { position:absolute; width:2px; height:2px; background:white; border-radius:50%; animation:twinkle 2s infinite; }
+  @keyframes twinkle { 0%,100%{opacity:1;}50%{opacity:0.3;} }
+  #chatWindow { position:absolute; bottom:20px; right:20px; width:300px; height:400px; background:rgba(0,0,50,0.85); border-radius:10px; display:flex; flex-direction:column; overflow:hidden; color:white; padding:10px; }
+  #messages { flex:1; overflow-y:auto; margin-bottom:10px; }
+  #messages div { margin-bottom:5px; }
+  #inputForm { display:flex; }
+  #inputForm input { flex:1; padding:5px; border-radius:5px; border:none; margin-right:5px; }
+  #inputForm button { padding:5px 10px; border-radius:5px; border:none; background:#0d6efd; color:white; cursor:pointer; }
+</style>
 </head>
 <body>
-  <canvas id="stars"></canvas>
-  <div id="chat-container">
-    <div id="messages"></div>
-    <input id="message-input" placeholder="Type a message..." />
-    <button id="send-btn">Send</button>
-  </div>
+<script>
+  const stars = 150;
+  for(let i=0;i<stars;i++){
+    const star=document.createElement('div');
+    star.className='star';
+    star.style.top=Math.random()*100+'%';
+    star.style.left=Math.random()*100+'%';
+    star.style.width=star.style.height=Math.random()*2+1+'px';
+    star.style.animationDuration=(Math.random()*3+2)+'s';
+    document.body.appendChild(star);
+  }
+</script>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    // Starry background
-    const canvas = document.getElementById('stars');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+<div id="chatWindow">
+  <div id="messages"></div>
+  <form id="inputForm">
+    <input id="msgInput" autocomplete="off" placeholder="Type a message..." />
+    <button>Send</button>
+  </form>
+</div>
 
-    const stars = [];
-    for(let i=0;i<200;i++){
-      stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*1.5,speed:Math.random()*0.5});
-    }
-    function drawStars(){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      for(const s of stars){
-        ctx.beginPath();
-        ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-        ctx.fillStyle='white';
-        ctx.fill();
-        s.y += s.speed;
-        if(s.y>canvas.height)s.y=0;
-      }
-      requestAnimationFrame(drawStars);
-    }
-    drawStars();
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket=io();
+const form=document.getElementById('inputForm');
+const input=document.getElementById('msgInput');
+const messages=document.getElementById('messages');
 
-    // Chat
-    const socket = io();
-    const messages = document.getElementById('messages');
-    const input = document.getElementById('message-input');
-    const btn = document.getElementById('send-btn');
+socket.on('chat history', msgs=>{
+  msgs.forEach(m=>{
+    const div=document.createElement('div');
+    div.textContent=m.text;
+    messages.appendChild(div);
+  });
+  messages.scrollTop=messages.scrollHeight;
+});
 
-    btn.onclick = () => {
-      const msg = input.value.trim();
-      if(!msg) return;
-      socket.emit('chat message', msg);
-      input.value = '';
-    };
+form.addEventListener('submit',e=>{
+  e.preventDefault();
+  if(!input.value) return;
+  socket.emit('chat message', input.value);
+  input.value='';
+});
 
-    socket.on('chat message', msg => {
-      const div = document.createElement('div');
-      div.textContent = msg;
-      messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
-    });
-  </script>
+socket.on('chat message',m=>{
+  const div=document.createElement('div');
+  div.textContent=m.text;
+  messages.appendChild(div);
+  messages.scrollTop=messages.scrollHeight;
+});
+</script>
 </body>
 </html>

@@ -1,32 +1,29 @@
 const express = require('express');
+const app = express();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 const fs = require('fs');
-const http = require('http');
-const { Server } = require('socket.io');
 const path = require('path');
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
 const PORT = 3000;
-const dbPath = path.join(__dirname, 'data', 'db.json');
+const dbPath = path.join(__dirname, 'data', 'users.json');
+const messagesPath = path.join(__dirname, 'data', 'messages.json');
 
 // Ensure data folder exists
 if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
+if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, JSON.stringify({ users: {}, stats: { restarts: 0 } }, null, 2));
+if (!fs.existsSync(messagesPath)) fs.writeFileSync(messagesPath, JSON.stringify([]));
 
-// Read DB
-function readDB() {
-  if (!fs.existsSync(dbPath)) return { users: {}, messages: [], stats: {} };
-  return JSON.parse(fs.readFileSync(dbPath));
-}
-
-// Write DB
-function writeDB(data) {
-  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-}
-
+// Middleware
 app.use(express.json());
 app.use(express.static('public'));
+
+// DB helpers
+function readDB() { return JSON.parse(fs.readFileSync(dbPath)); }
+function writeDB(data) { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)); }
+
+function readMessages() { return JSON.parse(fs.readFileSync(messagesPath)); }
+function writeMessages(data) { fs.writeFileSync(messagesPath, JSON.stringify(data, null, 2)); }
 
 // --- AUTH ROUTES ---
 app.post('/signup', (req, res) => {
@@ -46,26 +43,30 @@ app.post('/login', (req, res) => {
   const db = readDB();
   const user = db.users[username];
   if (!user || user.password !== password) return res.status(400).json({ error: 'Invalid login' });
+
   res.json({ success: true });
 });
 
-// --- SOCKET.IO ---
-io.on('connection', (socket) => {
+// --- CHAT SOCKET ---
+io.on('connection', socket => {
   console.log('New socket:', socket.id);
-  const db = readDB();
 
-  // Send existing messages
-  socket.emit('chat history', db.messages);
+  // Send existing messages on connection
+  const messages = readMessages();
+  socket.emit('chat history', messages);
 
-  socket.on('chat message', ({ user, msg }) => {
-    const message = { user, msg, time: new Date().toISOString() };
-    db.messages.push(message);
-    writeDB(db);
+  socket.on('chat message', msg => {
+    const messages = readMessages();
+    const message = { text: msg, timestamp: Date.now() };
+    messages.push(message);
+    writeMessages(messages);
+
     io.emit('chat message', message);
   });
 });
 
-server.listen(PORT, () => {
+// Start server
+http.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   const db = readDB();
   db.stats.restarts = (db.stats.restarts || 0) + 1;
