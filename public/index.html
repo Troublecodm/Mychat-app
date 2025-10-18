@@ -2,95 +2,119 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ChatApp</title>
+  <title>MyChat</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script src="/socket.io/socket.io.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; }
-    #users { width: 200px; border-right: 1px solid #ccc; padding: 10px; overflow-y: auto; }
-    #chat { flex: 1; display: flex; flex-direction: column; }
-    #messages { flex: 1; overflow-y: auto; padding: 10px; }
-    #input { display: flex; padding: 10px; }
-    #input input { flex: 1; padding: 5px; }
-    #input button { padding: 5px 10px; }
-    .dm-popup { position: fixed; bottom: 10px; right: 10px; width: 300px; background: #eee; border: 1px solid #ccc; display: none; flex-direction: column; }
-    .dm-popup .messages { flex: 1; overflow-y: auto; padding: 5px; height: 150px; }
-    .dm-popup input { padding: 5px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin:0; padding:0;
+      display:flex; flex-direction:column; height:100vh;
+      background: #001f3f;
+      overflow: hidden;
+    }
+
+    #stars {
+      position: absolute;
+      width: 100%; height: 100%;
+      background: transparent;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .star {
+      position: absolute;
+      width: 2px; height: 2px;
+      background: white;
+      border-radius: 50%;
+      animation: twinkle linear infinite;
+    }
+
+    @keyframes twinkle {
+      0% { opacity: 0; transform: translateY(0px); }
+      50% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-1000px); }
+    }
+
+    #chat {
+      position: relative;
+      z-index: 1;
+      flex:1; overflow-y:auto; padding:10px;
+      background: rgba(0,0,0,0.2);
+      color: white;
+    }
+
+    #messageForm {
+      display:flex; border-top:1px solid #ccc; z-index:1; position: relative;
+    }
+
+    #msgInput {
+      flex:1; padding:10px; border:none; outline:none;
+      background: rgba(255,255,255,0.2); color: white;
+    }
+
+    #sendBtn {
+      padding:10px; background:#007BFF; color:#fff; border:none; cursor:pointer;
+    }
+
+    .message { margin-bottom:10px; }
+    .message strong { color:#FFD700; }
+    .timestamp { font-size:0.7em; color:#ddd; margin-left:5px; }
   </style>
 </head>
 <body>
-  <div id="users"><h3>Users</h3><ul id="userList"></ul></div>
-  <div id="chat">
-    <div id="messages"></div>
-    <div id="input">
-      <input id="msg" placeholder="Type a message...">
-      <button id="send">Send</button>
-    </div>
-  </div>
+  <div id="stars"></div>
+  <div id="chat"></div>
+  <form id="messageForm">
+    <input id="msgInput" autocomplete="off" placeholder="Type a message" />
+    <button id="sendBtn">Send</button>
+  </form>
 
-  <div id="dmPopup" class="dm-popup">
-    <h4 id="dmTitle"></h4>
-    <div class="messages" id="dmMessages"></div>
-    <input id="dmInput" placeholder="Message">
-    <button id="dmSend">Send</button>
-  </div>
-
-  <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    const username = localStorage.getItem('username');
-    if (!username) window.location.href = '/login.html';
-    socket.emit('join', username);
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('messageForm');
+    const input = document.getElementById('msgInput');
 
-    const messages = document.getElementById('messages');
-    const msgInput = document.getElementById('msg');
-    const sendBtn = document.getElementById('send');
-    const userList = document.getElementById('userList');
+    const username = localStorage.getItem('username') || 'Anonymous';
 
-    // Send public message
-    sendBtn.onclick = () => {
-      if (!msgInput.value) return;
-      socket.emit('chat message', msgInput.value);
-      msgInput.value = '';
-    };
-
-    // Receive public message
-    socket.on('chat message', ({ user, msg }) => {
+    function addMessage({ user, msg, time }) {
       const div = document.createElement('div');
-      div.textContent = user + ': ' + msg;
-      messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
-    });
-
-    // --- DMs ---
-    const dmPopup = document.getElementById('dmPopup');
-    const dmTitle = document.getElementById('dmTitle');
-    const dmMessages = document.getElementById('dmMessages');
-    const dmInput = document.getElementById('dmInput');
-    const dmSend = document.getElementById('dmSend');
-    let currentDM = '';
-
-    // Open DM
-    function openDM(to) {
-      currentDM = to;
-      dmTitle.textContent = 'DM: ' + to;
-      dmMessages.innerHTML = '';
-      dmPopup.style.display = 'flex';
+      div.classList.add('message');
+      const t = new Date(time).toLocaleTimeString();
+      div.innerHTML = '<strong>' + user + '</strong>: ' + msg + '<span class="timestamp">' + t + '</span>';
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
     }
 
-    dmSend.onclick = () => {
-      if (!dmInput.value || !currentDM) return;
-      socket.emit('dm', { to: currentDM, msg: dmInput.value });
-      dmInput.value = '';
-    };
-
-    socket.on('dm', ({ from, msg, to }) => {
-      if (to === username) openDM(from);
-      if ((from === currentDM) || (to === username && from === currentDM)) {
-        const div = document.createElement('div');
-        div.textContent = from + ': ' + msg;
-        dmMessages.appendChild(div);
-        dmMessages.scrollTop = dmMessages.scrollHeight;
-      }
+    // Load chat history
+    socket.on('chat history', (messages) => {
+      messages.forEach(addMessage);
     });
+
+    // Listen for new messages
+    socket.on('chat message', addMessage);
+
+    // Send message
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!input.value.trim()) return;
+      socket.emit('chat message', { user: username, msg: input.value });
+      input.value = '';
+    });
+
+    // Generate stars
+    const starsContainer = document.getElementById('stars');
+    const numStars = 150;
+    for(let i=0; i<numStars; i++){
+      const star = document.createElement('div');
+      star.classList.add('star');
+      star.style.top = Math.random() * window.innerHeight + 'px';
+      star.style.left = Math.random() * window.innerWidth + 'px';
+      star.style.animationDuration = 5 + Math.random()*5 + 's';
+      star.style.width = star.style.height = 1 + Math.random()*2 + 'px';
+      starsContainer.appendChild(star);
+    }
   </script>
 </body>
 </html>

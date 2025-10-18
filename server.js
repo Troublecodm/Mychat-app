@@ -9,21 +9,24 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = 3000;
-const dbPath = path.join(__dirname, 'data', 'users.json');
+const dbPath = path.join(__dirname, 'data', 'db.json');
 
-app.use(express.json());
-app.use(express.static('public'));
+// Ensure data folder exists
+if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
 
-// Read/write DB helpers
+// Read DB
 function readDB() {
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify({ users: {}, stats: { restarts: 0 } }, null, 2));
-  }
+  if (!fs.existsSync(dbPath)) return { users: {}, messages: [], stats: {} };
   return JSON.parse(fs.readFileSync(dbPath));
 }
+
+// Write DB
 function writeDB(data) {
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
 }
+
+app.use(express.json());
+app.use(express.static('public'));
 
 // --- AUTH ROUTES ---
 app.post('/signup', (req, res) => {
@@ -31,9 +34,9 @@ app.post('/signup', (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
 
   const db = readDB();
-  if (db.users[username]) return res.status(400).json({ error: 'User exists' });
+  if (db.users[username]) return res.status(400).json({ error: 'User already exists' });
 
-  db.users[username] = { password, online: false, lastSeen: null, avatar: '', dms: {} };
+  db.users[username] = { password, avatar: '', online: false, lastSeen: null };
   writeDB(db);
   res.json({ success: true });
 });
@@ -43,47 +46,22 @@ app.post('/login', (req, res) => {
   const db = readDB();
   const user = db.users[username];
   if (!user || user.password !== password) return res.status(400).json({ error: 'Invalid login' });
-
-  user.online = true;
-  writeDB(db);
   res.json({ success: true });
 });
 
 // --- SOCKET.IO ---
-io.on('connection', socket => {
+io.on('connection', (socket) => {
   console.log('New socket:', socket.id);
+  const db = readDB();
 
-  socket.on('join', username => {
-    const db = readDB();
-    if (!db.users[username]) return;
-    db.users[username].online = true;
+  // Send existing messages
+  socket.emit('chat history', db.messages);
+
+  socket.on('chat message', ({ user, msg }) => {
+    const message = { user, msg, time: new Date().toISOString() };
+    db.messages.push(message);
     writeDB(db);
-    socket.username = username;
-  });
-
-  socket.on('chat message', msg => {
-    io.emit('chat message', { user: socket.username, msg });
-  });
-
-  socket.on('dm', ({ to, msg }) => {
-    const db = readDB();
-    if (!db.users[to] || !socket.username) return;
-
-    // Save DM to JSON
-    if (!db.users[to].dms[socket.username]) db.users[to].dms[socket.username] = [];
-    if (!db.users[socket.username].dms[to]) db.users[socket.username].dms[to] = [];
-
-    db.users[to].dms[socket.username].push({ from: socket.username, msg });
-    db.users[socket.username].dms[to].push({ from: socket.username, msg });
-
-    writeDB(db);
-    socket.emit('dm', { from: socket.username, msg, to });
-  });
-
-  socket.on('disconnect', () => {
-    const db = readDB();
-    if (socket.username && db.users[socket.username]) db.users[socket.username].online = false;
-    writeDB(db);
+    io.emit('chat message', message);
   });
 });
 
