@@ -1,72 +1,76 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MyChat</title>
-<style>
-  body { margin:0; padding:0; height:100vh; background:black; font-family: Arial,sans-serif; overflow:hidden; }
-  .star { position:absolute; width:2px; height:2px; background:white; border-radius:50%; animation:twinkle 2s infinite; }
-  @keyframes twinkle { 0%,100%{opacity:1;}50%{opacity:0.3;} }
-  #chatWindow { position:absolute; bottom:20px; right:20px; width:300px; height:400px; background:rgba(0,0,50,0.85); border-radius:10px; display:flex; flex-direction:column; overflow:hidden; color:white; padding:10px; }
-  #messages { flex:1; overflow-y:auto; margin-bottom:10px; }
-  #messages div { margin-bottom:5px; }
-  #inputForm { display:flex; }
-  #inputForm input { flex:1; padding:5px; border-radius:5px; border:none; margin-right:5px; }
-  #inputForm button { padding:5px 10px; border-radius:5px; border:none; background:#0d6efd; color:white; cursor:pointer; }
-</style>
+  <meta charset="utf-8">
+  <title>MyChat</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { margin: 0; font-family: sans-serif; background: black; color: white; overflow: hidden; }
+    #chatBox { height: 90vh; overflow-y: scroll; padding: 10px; }
+    #msgForm { position: fixed; bottom: 0; width: 100%; display: flex; }
+    #msgInput { flex: 1; padding: 10px; font-size: 16px; }
+    #sendBtn { padding: 10px 20px; font-size: 16px; }
+    .message { margin: 5px 0; }
+    canvas { position: fixed; top:0; left:0; width: 100%; height: 100%; z-index: -1; }
+  </style>
 </head>
 <body>
-<script>
-  const stars = 150;
-  for(let i=0;i<stars;i++){
-    const star=document.createElement('div');
-    star.className='star';
-    star.style.top=Math.random()*100+'%';
-    star.style.left=Math.random()*100+'%';
-    star.style.width=star.style.height=Math.random()*2+1+'px';
-    star.style.animationDuration=(Math.random()*3+2)+'s';
-    document.body.appendChild(star);
-  }
-</script>
-
-<div id="chatWindow">
-  <div id="messages"></div>
-  <form id="inputForm">
-    <input id="msgInput" autocomplete="off" placeholder="Type a message..." />
-    <button>Send</button>
+  <canvas id="bg"></canvas>
+  <div id="chatBox"></div>
+  <form id="msgForm">
+    <input id="msgInput" autocomplete="off" /><button id="sendBtn">Send</button>
   </form>
-</div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-const socket=io();
-const form=document.getElementById('inputForm');
-const input=document.getElementById('msgInput');
-const messages=document.getElementById('messages');
+  <script>
+    const socket = io();
+    const chatBox = document.getElementById('chatBox');
+    const form = document.getElementById('msgForm');
+    const input = document.getElementById('msgInput');
 
-socket.on('chat history', msgs=>{
-  msgs.forEach(m=>{
-    const div=document.createElement('div');
-    div.textContent=m.text;
-    messages.appendChild(div);
-  });
-  messages.scrollTop=messages.scrollHeight;
-});
+    async function loadMessages() {
+      const res = await fetch('/messages');
+      const messages = await res.json();
+      messages.forEach(msg => appendMessage(msg));
+    }
 
-form.addEventListener('submit',e=>{
-  e.preventDefault();
-  if(!input.value) return;
-  socket.emit('chat message', input.value);
-  input.value='';
-});
+    function appendMessage(data) {
+      const div = document.createElement('div');
+      div.classList.add('message');
+      div.textContent = data.username + ': ' + data.text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
 
-socket.on('chat message',m=>{
-  const div=document.createElement('div');
-  div.textContent=m.text;
-  messages.appendChild(div);
-  messages.scrollTop=messages.scrollHeight;
-});
-</script>
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const text = input.value;
+      if (!text) return;
+      const username = prompt('Enter your username') || 'Anonymous';
+      const data = { username, text };
+      socket.emit('chat message', data);
+      appendMessage(data);
+      input.value = '';
+    });
+
+    socket.on('chat message', appendMessage);
+
+    // Simple star background
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const stars = Array.from({length:200}, () => ({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*2+1}));
+    function draw() {
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = 'white';
+      stars.forEach(s => { ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); });
+      requestAnimationFrame(draw);
+    }
+    draw();
+
+    loadMessages();
+  </script>
 </body>
 </html>

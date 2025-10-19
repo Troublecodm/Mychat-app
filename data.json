@@ -1,0 +1,33 @@
+{
+  "messages": [
+    {
+      "username": "user2",
+      "text": "Ok"
+    },
+    {
+      "username": "user2",
+      "text": "Ok"
+    },
+    {
+      "to": "all",
+      "text": "Ok",
+      "time": "2025-10-19T07:54:21.783Z"
+    },
+    {
+      "from": "user2",
+      "to": null,
+      "text": "Feranmi "
+    }
+  ],
+  "users": {
+    "user2": {
+      "online": false
+    },
+    "Feranmi": {
+      "online": true
+    }
+  },
+  "stats": {
+    "restarts": 11
+  }
+}

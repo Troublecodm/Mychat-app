@@ -1,7 +1,16 @@
 {
-  "users": {},
+  "users": {
+    "user2": {
+      "username": "user2",
+      "online": false
+    },
+    "feranmi ": {
+      "username": "feranmi ",
+      "online": true
+    }
+  },
   "dms": {},
   "stats": {
-    "restarts": 1
+    "restarts": 4
   }
 }

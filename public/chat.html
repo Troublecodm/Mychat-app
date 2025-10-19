@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChatApp</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin:0; font-family:sans-serif; background:#001; overflow:hidden; }
+canvas#bg { position:fixed; top:0; left:0; z-index:-1; width:100%; height:100%; }
+#login { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; color:#fff; }
+#chat-container { display:none; flex-direction:column; height:100vh; }
+#messages { flex:1; overflow-y:auto; padding:10px; }
+#input-bar { display:flex; padding:5px; }
+#input-bar input { flex:1; padding:10px; border-radius:5px; border:none; margin-right:5px; }
+#input-bar button { padding:10px; border-radius:5px; border:none; background:#28f; color:#fff; cursor:pointer; }
+.message { margin-bottom:5px; }
+.dm-popup { position:fixed; bottom:10px; right:10px; width:300px; max-height:400px; background:#111; border:2px solid #28f; display:none; flex-direction:column; }
+.dm-header { background:#28f; padding:5px; cursor:pointer; color:#fff; text-align:center; }
+.dm-messages { flex:1; overflow-y:auto; padding:5px; color:#fff; }
+.dm-input { display:flex; }
+.dm-input input { flex:1; padding:5px; border:none; border-radius:3px; margin-right:5px; }
+.dm-input button { padding:5px; border:none; border-radius:3px; background:#28f; color:#fff; cursor:pointer; }
+.typing { font-size:0.8em; color:#0f0; }
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<div id="login">
+    <h1>Enter your username</h1>
+    <input id="username" placeholder="Username">
+    <button id="enter-btn">Enter Chat</button>
+</div>
+
+<div id="chat-container">
+    <div id="messages"></div>
+    <div class="typing" id="typing"></div>
+    <div id="input-bar">
+        <input id="chat-input" placeholder="Type a message">
+        <button id="send-btn">Send</button>
+        <button id="dm-btn">DM</button>
+    </div>
+</div>
+
+<div class="dm-popup" id="dm-popup">
+    <div class="dm-header" id="dm-header">DM</div>
+    <div class="dm-messages" id="dm-messages"></div>
+    <div class="dm-input">
+        <input id="dm-input" placeholder="Message">
+        <button id="dm-send-btn">Send</button>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let username = '';
+let currentDMUser = '';
+
+function animateBG(){
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const stars = Array.from({length:150},()=>({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*1.5}));
+    function draw(){
+        ctx.fillStyle = '#001';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#fff';
+        stars.forEach(s=>{ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); s.y+=0.2; if(s.y>canvas.height) s.y=0;});
+        requestAnimationFrame(draw);
+    }
+    draw();
+}
+animateBG();
+
+const loginDiv = document.getElementById('login');
+const chatContainer = document.getElementById('chat-container');
+const messagesDiv = document.getElementById('messages');
+const chatInput = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+const dmBtn = document.getElementById('dm-btn');
+const dmPopup = document.getElementById('dm-popup');
+const dmHeader = document.getElementById('dm-header');
+const dmMessages = document.getElementById('dm-messages');
+const dmInput = document.getElementById('dm-input');
+const dmSendBtn = document.getElementById('dm-send-btn');
+const typingDiv = document.getElementById('typing');
+
+document.getElementById('enter-btn').onclick = ()=>{
+    username = document.getElementById('username').value.trim();
+    if(!username) return alert('Enter username');
+    loginDiv.style.display='none';
+    chatContainer.style.display='flex';
+    socket.emit('register',{username});
+};
+
+sendBtn.onclick = ()=>{
+    const msg = chatInput.value.trim();
+    if(!msg) return;
+    const data = {from:username,msg,time:new Date().toLocaleTimeString()};
+    socket.emit('chat',data);
+    chatInput.value='';
+};
+
+chatInput.oninput = ()=>{
+    socket.emit('typing',{user:username});
+};
+
+dmBtn.onclick = ()=>{
+    const user = prompt('DM to:');
+    if(!user) return;
+    currentDMUser = user;
+    dmHeader.textContent = 'DM: '+user;
+    dmPopup.style.display='flex';
+    dmMessages.innerHTML=''; // will populate with DM history from server
+};
+
+dmSendBtn.onclick = ()=>{
+    const msg = dmInput.value.trim();
+    if(!msg || !currentDMUser) return;
+    socket.emit('dm',{from:username,to:currentDMUser,msg});
+    dmMessages.innerHTML += `<div><b>You:</b> ${msg}</div>`;
+    dmInput.value='';
+};
+
+dmHeader.onclick = ()=>{ dmPopup.style.display='none'; currentDMUser=''; };
+
+// Socket listeners
+socket.on('chat', data=>{
+    messagesDiv.innerHTML += `<div class="message"><b>${data.from}:</b> ${data.msg} <span style="font-size:0.7em">${data.time}</span></div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+});
+
+socket.on('typing', data=>{
+    typingDiv.textContent = `${data.user} is typing...`;
+    setTimeout(()=>{ typingDiv.textContent=''; },1000);
+});
+
+socket.on('dm', data=>{
+    if(data.from===currentDMUser) dmMessages.innerHTML += `<div><b>${data.from}:</b> ${data.msg}</div>`;
+});
+</script>
+
+</body>
+</html>

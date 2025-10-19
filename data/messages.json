@@ -1,0 +1,30 @@
+[
+  {
+    "username": "user2",
+    "text": "Yoo"
+  },
+  {
+    "username": "user2",
+    "text": "Yooooo"
+  },
+  {
+    "username": "user2",
+    "text": "Ok"
+  },
+  {
+    "username": "user2",
+    "text": "Heey bwoi"
+  },
+  {
+    "username": "user2",
+    "text": "cat > public/index.html << 'EOF' <!doctype html> <html> <head> <meta charset=\"utf-8\"> <title>MyChat Pro</title> <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"> <script src=\"/socket.io/socket.io.js\"></script> <style> body { margin:0; font-family:sans-serif; height:100vh; overflow:hidden; background:#001a33; color:white; } #stars { position:fixed; width:100%; height:100%; background:transparent; z-index:-1; } #username-screen, #chat-container { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; width:100vw; } #username-screen input { padding:15px; font-size:18px; border-radius:10px; border:none; margin-bottom:10px; width:60%; } #username-screen button { padding:10px 20px; font-size:18px; border:none; border-radius:10px; background:#ff9800; color:white; cursor:pointer; } #chat-container { display:none; flex-direction:column; height:100vh; width:100vw; } #messages { flex:1; overflow-y:auto; width:100%; padding:20px; display:flex; flex-direction:column; } .message { max-width:70%; padding:10px 15px; margin:5px 0; border-radius:20px; animation:fadeIn 0.3s; word-wrap:break-word; } .message.self { background: linear-gradient(135deg,#4caf50,#81c784); align-self:flex-end; color:white; } .message.other { background: linear-gradient(135deg,#2196f3,#64b5f6); align-self:flex-start; color:white; } #input { display:flex; width:100%; padding:10px; background:rgba(0,0,0,0.2); } #input input { flex:1; padding:10px; font-size:16px; border:none; border-radius:10px; margin-right:10px; } #input button { padding:10px 20px; font-size:16px; border:none; border-radius:10px; background:#ff9800; color:white; cursor:pointer; }  @keyframes fadeIn { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} } </style> </head> <body> <div id=\"stars\"></div>  <div id=\"username-screen\">   <input id=\"username-input\" placeholder=\"Choose your username\" maxlength=\"20\"/>   <button id=\"enter-chat\">Enter Chat</button> </div>  <div id=\"chat-container\">   <div id=\"messages\"></div>   <div id=\"input\">     <input id=\"msg\" placeholder=\"Type a message...\"/>     <button id=\"send\">Send</button>   </div> </div>  <script> const socket = io(); let username = localStorage.getItem('username');  const usernameScreen = document.getElementById('username-screen'); const usernameInput = document.getElementById('username-input'); const enterBtn = document.getElementById('enter-chat'); const chatContainer = document.getElementById('chat-container'); const messages = document.getElementById('messages'); const input = document.getElementById('msg'); const sendBtn = document.getElementById('send');  function addMessage(data, self=false){   const div = document.createElement('div');   div.classList.add('message', self?'self':'other');   div.textContent = data.username + ': ' + data.text;   messages.appendChild(div);   messages.scrollTop = messages.scrollHeight; }  function startChat(){   usernameScreen.style.display = 'none';   chatContainer.style.display = 'flex';   localStorage.setItem('username', username);   socket.emit('new user', username);   socket.emit('request messages'); }  if(username){   startChat(); }  enterBtn.onclick = () => {   const name = usernameInput.value.trim();   if(!name){ alert('Please choose a username'); return; }   username = name;   startChat(); };  sendBtn.onclick = () => {   const text = input.value.trim();   if(!text) return;   const msg = { username, text };   socket.emit('chat message', msg);   addMessage(msg, true);   input.value = ''; };  input.addEventListener('keypress', e => { if(e.key==='Enter') sendBtn.click(); });  socket.on('load messages', msgs => { msgs.forEach(m => addMessage(m, m.username===username)); }); socket.on('chat message', m => { if(m.username!==username) addMessage(m); });  // Starry background animation const stars = document.getElementById('stars'); const numStars = 120; for(let i=0;i<numStars;i++){   const star = document.createElement('div');   star.style.position='absolute';   star.style.width='2px'; star.style.height='2px';   star.style.background='white';   star.style.top=Math.random()*100+'%';   star.style.left=Math.random()*100+'%';   star.style.opacity=Math.random();   star.style.animation='twinkle '+(Math.random()*3+2)+'s infinite alternate';   stars.appendChild(star); } const style = document.createElement('style'); style.textContent='@keyframes twinkle {0%{opacity:0}100%{opacity:1}}'; document.head.appendChild(style); </script> </body> </html> EOF"
+  },
+  {
+    "username": "user2",
+    "text": "Ok"
+  },
+  {
+    "username": "user2",
+    "text": "I no get competition"
+  }
+]
