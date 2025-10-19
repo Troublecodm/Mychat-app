@@ -1,76 +1,106 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>MyChat</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <script src="/socket.io/socket.io.js"></script>
-  <style>
-    body { margin: 0; font-family: sans-serif; background: black; color: white; overflow: hidden; }
-    #chatBox { height: 90vh; overflow-y: scroll; padding: 10px; }
-    #msgForm { position: fixed; bottom: 0; width: 100%; display: flex; }
-    #msgInput { flex: 1; padding: 10px; font-size: 16px; }
-    #sendBtn { padding: 10px 20px; font-size: 16px; }
-    .message { margin: 5px 0; }
-    canvas { position: fixed; top:0; left:0; width: 100%; height: 100%; z-index: -1; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat App</title>
+<link rel="stylesheet" href="style.css">
+<script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-  <canvas id="bg"></canvas>
-  <div id="chatBox"></div>
-  <form id="msgForm">
-    <input id="msgInput" autocomplete="off" /><button id="sendBtn">Send</button>
-  </form>
 
-  <script>
-    const socket = io();
-    const chatBox = document.getElementById('chatBox');
-    const form = document.getElementById('msgForm');
-    const input = document.getElementById('msgInput');
+<div id="username-page">
+  <div class="username-box">
+    <h2>Enter Username</h2>
+    <input type="text" id="username" placeholder="Username">
+    <button id="startBtn">Start Chat</button>
+  </div>
+</div>
 
-    async function loadMessages() {
-      const res = await fetch('/messages');
-      const messages = await res.json();
-      messages.forEach(msg => appendMessage(msg));
-    }
+<div id="chat-page" class="hidden">
+  <div class="chat-header">
+    <span>Chat App</span>
+    <span id="typing-indicator"></span>
+    <select id="dm-select"><option value="all">All</option></select>
+  </div>
+  <div id="chat-box"></div>
+  <div class="chat-input">
+    <input type="text" id="msgInput" placeholder="Type a message">
+    <button id="sendBtn">Send</button>
+  </div>
+</div>
 
-    function appendMessage(data) {
+<script>
+const socket = io();
+let username = localStorage.getItem('username');
+
+const usernamePage = document.getElementById('username-page');
+const chatPage = document.getElementById('chat-page');
+const startBtn = document.getElementById('startBtn');
+const usernameInput = document.getElementById('username');
+
+const chatBox = document.getElementById('chat-box');
+const msgInput = document.getElementById('msgInput');
+const sendBtn = document.getElementById('sendBtn');
+const dmSelect = document.getElementById('dm-select');
+
+function showChat() {
+  usernamePage.classList.add('hidden');
+  chatPage.classList.remove('hidden');
+  loadMessages();
+}
+
+async function loadMessages() {
+  const res = await fetch('/messages/' + username);
+  const msgs = await res.json();
+  chatBox.innerHTML = '';
+  msgs.forEach(m=>{
+    if(dmSelect.value==='all' || m.to===dmSelect.value){
       const div = document.createElement('div');
       div.classList.add('message');
-      div.textContent = data.username + ': ' + data.text;
+      div.innerHTML = `<span class="from">${m.to==="all"?m.to:m.to+" → " + username}</span>: ${m.text} <span class="time">${new Date(m.time).toLocaleTimeString()}</span>`;
       chatBox.appendChild(div);
-      chatBox.scrollTop = chatBox.scrollHeight;
     }
+  });
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
 
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      const text = input.value;
-      if (!text) return;
-      const username = prompt('Enter your username') || 'Anonymous';
-      const data = { username, text };
-      socket.emit('chat message', data);
-      appendMessage(data);
-      input.value = '';
-    });
+startBtn.onclick = async ()=>{
+  username = usernameInput.value.trim();
+  if(!username) return alert('Enter username');
+  const res = await fetch('/set-username', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username})
+  });
+  const data = await res.json();
+  if(data.success){
+    localStorage.setItem('username', username);
+    showChat();
+  }
+};
 
-    socket.on('chat message', appendMessage);
+sendBtn.onclick = async ()=>{
+  const text = msgInput.value.trim();
+  const to = dmSelect.value;
+  if(!text) return;
+  await fetch('/messages/'+username,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({to,text})
+  });
+  socket.emit('dm',{from:username,to,text});
+  msgInput.value='';
+  loadMessages();
+};
 
-    // Simple star background
-    const canvas = document.getElementById('bg');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const stars = Array.from({length:200}, () => ({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*2+1}));
-    function draw() {
-      ctx.fillStyle = 'black';
-      ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle = 'white';
-      stars.forEach(s => { ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); });
-      requestAnimationFrame(draw);
-    }
-    draw();
+socket.on('dm', m=>{
+  if(m.to==='all' || m.to===username || m.from===username) loadMessages();
+});
 
-    loadMessages();
-  </script>
+window.onload = ()=>{
+  if(username) showChat();
+};
+</script>
 </body>
 </html>
